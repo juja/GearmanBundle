@@ -13,6 +13,7 @@
 
 namespace Mmoreram\GearmanBundle\Tests\Service;
 
+use Doctrine\Common\Annotations\AnnotationReader;
 use Doctrine\Common\Annotations\Reader;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\Finder\Finder;
@@ -89,6 +90,111 @@ class GearmanParserTest extends WebTestCase
                 ->get('gearman.parser')
         );
     }
+
+    public function testLoadWorkerWithAnnotations()
+    {
+        static::bootKernel();
+
+        $defaultSettings = [
+            'method' => 'doHigh',
+            'iterations' => 100,
+            'minimum_execution_time' => null,
+            'timeout' => null,
+            'callbacks' => true,
+            'jobPrefix' => null,
+            'generate_unique_key' => true,
+            'workers_name_prepend_namespace' => true,
+        ];
+        $gearmanParser = new GearmanParser(static::$kernel, new AnnotationReader(), new Finder(), [], ['TestClassesAnnotations'], [['host' => 'host-server-gearmand.test', 'port' => '4730']], $defaultSettings);
+        $expectedWorkers = [
+            [
+                'namespace' => 'Mmoreram\\GearmanBundle\\Tests\\Functional\\TestClassesAnnotations',
+                'className' => 'Mmoreram\GearmanBundle\Tests\Functional\TestClassesAnnotations\WorkerTestClassAnnotations',
+                'fileName' => '/var/www/GearmanBundle/Tests/Functional/TestClassesAnnotations/WorkerTestClassAnnotations.php',
+                'callableName' => 'MmoreramGearmanBundleTestsFunctionalTestClassesAnnotationsWorkerTestClassAnnotations',
+                'description' => 'Worker de prueba',
+                'service' => 'nombre.servicio',
+                'servers' => [['host' => 'host-server-gearmand.test', 'port' => '4730']],
+                'iterations' => 100,
+                'minimumExecutionTime' => 0,
+                'timeout' => 0,
+                'jobs' => [
+                    [
+                        'callableName' => 'job-de-prueba',
+                        'methodName' => 'jobTest',
+                        'realCallableName' => 'MmoreramGearmanBundleTestsFunctionalTestClassesAnnotationsWorkerTestClassAnnotations~job-de-prueba',
+                        'jobPrefix' => null,
+                        'realCallableNameNoPrefix' => 'MmoreramGearmanBundleTestsFunctionalTestClassesAnnotationsWorkerTestClassAnnotations~job-de-prueba',
+                        'description' => 'Descripción del job de prueba',
+                        'iterations' => 100,
+                        'minimumExecutionTime' => 0,
+                        'timeout' => 0,
+                        'servers' => [['host' => 'host-server-gearmand.test', 'port' => '4730']],
+                        'defaultMethod' => 'doBackground',
+                    ],
+                ],
+            ],
+        ];
+
+        $workersCollection = $gearmanParser->load();
+
+        $workersCreados = $workersCollection->toArray();
+        $this->assertCount(1, $workersCreados);
+        $this->assertEquals($expectedWorkers, $workersCreados);
+    }
+
+    public function testLoadWorkersWithAttributes()
+    {
+        static::bootKernel();
+
+        $defaultSettings = [
+            'method' => 'doHigh',
+            'iterations' => 100,
+            'minimum_execution_time' => null,
+            'timeout' => null,
+            'callbacks' => true,
+            'jobPrefix' => null,
+            'generate_unique_key' => true,
+            'workers_name_prepend_namespace' => true,
+        ];
+        $gearmanParser = new GearmanParser(static::$kernel, new AnnotationReader(), new Finder(), [], ['TestClassesAttributes'], [['host' => 'host-server-gearmand.test', 'port' => '4730']], $defaultSettings);
+        $expectedWorkers = [
+            [
+                'namespace' => 'Mmoreram\\GearmanBundle\\Tests\\Functional\\TestClassesAttributes',
+                'className' => 'Mmoreram\GearmanBundle\Tests\Functional\TestClassesAttributes\WorkerTestClassAttributes',
+                'fileName' => '/var/www/GearmanBundle/Tests/Functional/TestClassesAttributes/WorkerTestClassAttributes.php',
+                'callableName' => 'MmoreramGearmanBundleTestsFunctionalTestClassesAttributesWorkerTestClassAttributes',
+                'description' => 'Worker de prueba',
+                'service' => 'nombre.servicio',
+                'servers' => [['host' => 'host-server-gearmand.test', 'port' => '4730']],
+                'iterations' => 100,
+                'minimumExecutionTime' => 0,
+                'timeout' => 0,
+                'jobs' => [
+                    [
+                        'callableName' => 'job-de-prueba',
+                        'methodName' => 'jobTest',
+                        'realCallableName' => 'MmoreramGearmanBundleTestsFunctionalTestClassesAttributesWorkerTestClassAttributes~job-de-prueba',
+                        'jobPrefix' => null,
+                        'realCallableNameNoPrefix' => 'MmoreramGearmanBundleTestsFunctionalTestClassesAttributesWorkerTestClassAttributes~job-de-prueba',
+                        'description' => 'Descripción del job de prueba',
+                        'iterations' => 100,
+                        'minimumExecutionTime' => 0,
+                        'timeout' => 0,
+                        'servers' => [['host' => 'host-server-gearmand.test', 'port' => '4730']],
+                        'defaultMethod' => 'doBackground',
+                    ],
+                ],
+            ],
+        ];
+
+        $workersCollection = $gearmanParser->load();
+
+        $workersCreados = $workersCollection->toArray();
+        $this->assertCount(1, $workersCreados);
+        $this->assertEquals($expectedWorkers, $workersCreados);
+    }
+
 
     /**
      * testing getFileClassNamespace

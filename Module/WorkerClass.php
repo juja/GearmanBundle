@@ -144,7 +144,12 @@ class WorkerClass
         $jobCollection = new JobCollection();
 
         foreach ($reflectionClass->getMethods() as $reflectionMethod) {
-            $methodAnnotations = $reader->getMethodAnnotations($reflectionMethod);
+            $methodAttributes = $reflectionMethod->getAttributes(JobAnnotation::class, \ReflectionAttribute::IS_INSTANCEOF);
+            if (empty($methodAttributes)) {
+                $methodAnnotations = $reader->getMethodAnnotations($reflectionMethod);
+            } else {
+                $methodAnnotations = array_map(fn($attribute) => $attribute->newInstance(), $methodAttributes);
+            }
 
             foreach ($methodAnnotations as $methodAnnotation) {
                 if ($methodAnnotation instanceof JobAnnotation) {

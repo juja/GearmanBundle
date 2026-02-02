@@ -15,6 +15,7 @@ namespace Mmoreram\GearmanBundle\Tests\Module;
 
 use Doctrine\Common\Annotations\AnnotationReader;
 
+use Mmoreram\GearmanBundle\Driver\Gearman\Job;
 use Mmoreram\GearmanBundle\Driver\Gearman\Work as WorkAnnotation;
 use Mmoreram\GearmanBundle\Module\WorkerClass;
 
@@ -35,14 +36,14 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
      *
      * Reflection Class
      */
-    private $reflectionClass;
+    private $reflectionClassMock;
 
     /**
      * @var AnnotationReader
      *
      * Reader
      */
-    private $reader;
+    private $doctrineAnnotationReaderMock;
 
     /**
      * @var string
@@ -98,7 +99,7 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
      */
     public function setUp(): void
     {
-        $this->reflectionClass = $this
+        $this->reflectionClassMock = $this
             ->getMockBuilder('\ReflectionClass')
             ->setConstructorArgs(['\Mmoreram\GearmanBundle\Tests\Service\Mocks\SingleCleanFile'])
             ->setMethods([
@@ -106,15 +107,12 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
                 'getNamespaceName',
                 'getFileName',
                 'getMethods',
+                'getAttributes'
             ])
             ->getMock();
 
-        $this->workAnnotation = $this
-            ->getMockBuilder('\Mmoreram\GearmanBundle\Driver\Gearman\Work')
-            ->disableOriginalConstructor()
-            ->getMock();
 
-        $this->reader = $this
+        $this->doctrineAnnotationReaderMock = $this
             ->getMockBuilder('Doctrine\Common\Annotations\AnnotationReader')
             ->disableOriginalConstructor()
             ->setMethods([
@@ -132,69 +130,135 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
      */
     public function testWorkerAnnotationsDefined()
     {
-        $this
-            ->reflectionClass
-            ->expects($this->once())
-            ->method('getNamespaceName')
-            ->will($this->returnValue($this->classNamespace));
+        $this->mockReflectionClassWithWorkerAnnotationWithoutMethods();
+        $expectedWorkerConfig = [
+            'namespace' => $this->classNamespace,
+            'className' => $this->className,
+            'fileName' => $this->fileName,
+            'callableName' => $this->classNamespace . $this->workAnnotation->name,
+            'description' => $this->workAnnotation->description,
+            'service' => $this->workAnnotation->service,
+            'servers' => $this->workAnnotation->servers,
+            'iterations' => $this->workAnnotation->iterations,
+            'minimumExecutionTime' => $this->workAnnotation->minimumExecutionTime,
+            'timeout' => $this->workAnnotation->timeout,
+            'jobs' => [],
+        ];
 
-        $this
-            ->reflectionClass
-            ->expects($this->once())
-            ->method('getName')
-            ->will($this->returnValue($this->className));
+        $workerClass = new WorkerClass(
+            $this->workAnnotation,
+            $this->reflectionClassMock,
+            $this->doctrineAnnotationReaderMock,
+            $this->servers,
+            $this->defaultSettings
+        );
 
-        $this
-            ->reflectionClass
-            ->expects($this->once())
-            ->method('getFileName')
-            ->will($this->returnValue($this->fileName));
+        $this->assertEquals($expectedWorkerConfig, $workerClass->toArray());
+    }
 
-        $this
-            ->reflectionClass
-            ->expects($this->once())
-            ->method('getMethods')
-            ->will($this->returnValue([]));
-
-        $this
-            ->reader
-            ->expects($this->never())
-            ->method('getMethodAnnotations');
-
-        $this->workAnnotation->name = 'myOtherWorkerName';
-        $this->workAnnotation->description = 'This is my own description';
-        $this->workAnnotation->iterations = 200;
-        $this->workAnnotation->defaultMethod = 'doHighBackground';
-        $this->workAnnotation->service = 'my.service';
-        $this->workAnnotation->servers = [
-            [
-                'host'  =>  '10.0.0.2',
-                'port'  =>  '80',
+    public function testWorkerAnnotationsDefinedWithJobs()
+    {
+        $this->mockReflectionClassWithOneMethod();
+        $this->mockDoctrineAnnotationReader();
+        $expectedWorkerConfig = [
+            'namespace' => 'MyClassNamespace',
+            'className' => 'myClass',
+            'fileName' => 'myClass.php',
+            'callableName' => 'MyClassNamespacemyOtherWorkerName',
+            'description' => 'This is my own description',
+            'service' => 'my.service',
+            'servers' => [
+                [
+                    'host' => '10.0.0.2',
+                    'port' => '80',
+                ],
+            ],
+            'iterations' => 200,
+            'minimumExecutionTime' => 0,
+            'timeout' => 0,
+            'jobs' => [
+                [
+                    'callableName' => 'job-name-test',
+                    'methodName' => 'jobMethodName',
+                    'realCallableName' => 'MyClassNamespacemyOtherWorkerName~job-name-test',
+                    'jobPrefix' => null,
+                    'realCallableNameNoPrefix' => 'MyClassNamespacemyOtherWorkerName~job-name-test',
+                    'description' => 'This is my own description',
+                    'iterations' => 10,
+                    'minimumExecutionTime' => 13,
+                    'timeout' => 12,
+                    'servers' => [
+                        [
+                            'host' => '192.168.1.2',
+                            'port' => '88',
+                        ],
+                    ],
+                    'defaultMethod' => 'defaultMethodTest',
+                ],
             ],
         ];
 
         $workerClass = new WorkerClass(
             $this->workAnnotation,
-            $this->reflectionClass,
-            $this->reader,
+            $this->reflectionClassMock,
+            $this->doctrineAnnotationReaderMock,
             $this->servers,
             $this->defaultSettings
         );
 
-        $this->assertEquals($workerClass->toArray(), [
+        $this->assertEquals($expectedWorkerConfig, $workerClass->toArray());
+    }
 
-            'namespace'             =>  $this->classNamespace,
-            'className'             =>  $this->className,
-            'fileName'              =>  $this->fileName,
-            'callableName'          =>  $this->classNamespace . $this->workAnnotation->name,
-            'description'           =>  $this->workAnnotation->description,
-            'service'               =>  $this->workAnnotation->service,
-            'servers'               =>  $this->workAnnotation->servers,
-            'iterations'            =>  $this->workAnnotation->iterations,
-            'minimumExecutionTime'  =>  $this->workAnnotation->minimumExecutionTime,
-            'timeout'               =>  $this->workAnnotation->timeout,
-            'jobs'                  =>  [],
-        ]);
+    public function testWorkerAnnotationsDefinedWithJobs1()
+    {
+        $this->mockReflectionClassWithJobAttributes();
+        $expectedWorkerConfig = [
+            'namespace' => 'MyClassNamespace',
+            'className' => 'myClass',
+            'fileName' => 'myClass.php',
+            'callableName' => 'MyClassNamespacemyOtherWorkerName',
+            'description' => 'This is my own description',
+            'service' => 'my.service',
+            'servers' => [
+                [
+                    'host' => '10.0.0.2',
+                    'port' => '80',
+                ],
+            ],
+            'iterations' => 200,
+            'minimumExecutionTime' => 0,
+            'timeout' => 0,
+            'jobs' => [
+                [
+                    'callableName' => 'job-name-test',
+                    'methodName' => 'jobMethodName',
+                    'realCallableName' => 'MyClassNamespacemyOtherWorkerName~job-name-test',
+                    'jobPrefix' => null,
+                    'realCallableNameNoPrefix' => 'MyClassNamespacemyOtherWorkerName~job-name-test',
+                    'description' => 'This is my own description',
+                    'iterations' => 10,
+                    'minimumExecutionTime' => 13,
+                    'timeout' => 12,
+                    'servers' => [
+                        [
+                            'host' => '192.168.1.2',
+                            'port' => '88',
+                        ],
+                    ],
+                    'defaultMethod' => 'defaultMethodTest',
+                ],
+            ],
+        ];
+
+        $workerClass = new WorkerClass(
+            $this->workAnnotation,
+            $this->reflectionClassMock,
+            $this->doctrineAnnotationReaderMock,
+            $this->servers,
+            $this->defaultSettings
+        );
+
+        $this->assertEquals($expectedWorkerConfig, $workerClass->toArray());
     }
 
     /**
@@ -206,57 +270,30 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
      */
     public function testWorkerAnnotationsEmpty()
     {
-        $this
-            ->reflectionClass
-            ->expects($this->once())
-            ->method('getNamespaceName')
-            ->will($this->returnValue($this->classNamespace));
-
-        $this
-            ->reflectionClass
-            ->expects($this->exactly(2))
-            ->method('getName')
-            ->will($this->returnValue($this->className));
-
-        $this
-            ->reflectionClass
-            ->expects($this->once())
-            ->method('getFileName')
-            ->will($this->returnValue($this->fileName));
-
-        $this
-            ->reflectionClass
-            ->expects($this->once())
-            ->method('getMethods')
-            ->will($this->returnValue([]));
-
-        $this
-            ->reader
-            ->expects($this->never())
-            ->method('getMethodAnnotations');
+        $this->mockReflectionClassWithoutWorkerAnnotationWithoutMethods();
+        $expectedWorkerConfig = [
+            'namespace' => $this->classNamespace,
+            'className' => $this->className,
+            'fileName' => $this->fileName,
+            'callableName' => $this->className,
+            'description' => WorkerClass::DEFAULT_DESCRIPTION,
+            'service' => null,
+            'servers' => $this->servers,
+            'iterations' => $this->defaultSettings['iterations'],
+            'minimumExecutionTime' => $this->defaultSettings['minimum_execution_time'],
+            'timeout' => $this->defaultSettings['timeout'],
+            'jobs' => [],
+        ];
 
         $workerClass = new WorkerClass(
             $this->workAnnotation,
-            $this->reflectionClass,
-            $this->reader,
+            $this->reflectionClassMock,
+            $this->doctrineAnnotationReaderMock,
             $this->servers,
             $this->defaultSettings
         );
 
-        $this->assertEquals($workerClass->toArray(), [
-
-            'namespace'             =>  $this->classNamespace,
-            'className'             =>  $this->className,
-            'fileName'              =>  $this->fileName,
-            'callableName'          =>  $this->className,
-            'description'           =>  $workerClass::DEFAULT_DESCRIPTION,
-            'service'               =>  null,
-            'servers'               =>  $this->servers,
-            'iterations'            =>  $this->defaultSettings['iterations'],
-            'minimumExecutionTime'  =>  $this->defaultSettings['minimum_execution_time'],
-            'timeout'               =>  $this->defaultSettings['timeout'],
-            'jobs'                  =>  [],
-        ]);
+        $this->assertEquals($expectedWorkerConfig, $workerClass->toArray());
     }
 
     /**
@@ -264,61 +301,226 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
      */
     public function testCombinationServers()
     {
-        $this
-            ->reflectionClass
-            ->expects($this->once())
-            ->method('getNamespaceName')
-            ->will($this->returnValue($this->classNamespace));
-
-        $this
-            ->reflectionClass
-            ->expects($this->exactly(2))
-            ->method('getName')
-            ->will($this->returnValue($this->className));
-
-        $this
-            ->reflectionClass
-            ->expects($this->once())
-            ->method('getFileName')
-            ->will($this->returnValue($this->fileName));
-
-        $this
-            ->reflectionClass
-            ->expects($this->once())
-            ->method('getMethods')
-            ->will($this->returnValue([]));
-
-        $this
-            ->reader
-            ->expects($this->never())
-            ->method('getMethodAnnotations');
-
+        $this->mockReflectionClassWithoutWorkerAnnotationWithoutMethods();
         $this->workAnnotation->servers = [
             'host'  =>  '10.0.0.2',
             'port'  =>  '80',
         ];
+        $expectedWorkerConfig = [
+
+            'namespace' => $this->classNamespace,
+            'className' => $this->className,
+            'fileName' => $this->fileName,
+            'callableName' => $this->className,
+            'description' => WorkerClass::DEFAULT_DESCRIPTION,
+            'service' => null,
+            'servers' => [$this->workAnnotation->servers],
+            'iterations' => $this->defaultSettings['iterations'],
+            'minimumExecutionTime' => $this->defaultSettings['minimum_execution_time'],
+            'timeout' => $this->defaultSettings['timeout'],
+            'jobs' => [],
+        ];
 
         $workerClass = new WorkerClass(
             $this->workAnnotation,
-            $this->reflectionClass,
-            $this->reader,
+            $this->reflectionClassMock,
+            $this->doctrineAnnotationReaderMock,
             $this->servers,
             $this->defaultSettings
         );
 
-        $this->assertEquals($workerClass->toArray(), [
+        $this->assertEquals($expectedWorkerConfig, $workerClass->toArray());
+    }
 
-            'namespace'             =>  $this->classNamespace,
-            'className'             =>  $this->className,
-            'fileName'              =>  $this->fileName,
-            'callableName'          =>  $this->className,
-            'description'           =>  $workerClass::DEFAULT_DESCRIPTION,
-            'service'               =>  null,
-            'servers'               =>  [$this->workAnnotation->servers],
-            'iterations'            =>  $this->defaultSettings['iterations'],
-            'minimumExecutionTime'  =>  $this->defaultSettings['minimum_execution_time'],
-            'timeout'               =>  $this->defaultSettings['timeout'],
-            'jobs'                  =>  [],
+    /**
+     * @return void
+     */
+    public function mockReflectionClassWithOneMethod(): void
+    {
+        $this
+            ->reflectionClassMock
+            ->method('getNamespaceName')
+            ->will($this->returnValue($this->classNamespace));
+
+        $this
+            ->reflectionClassMock
+            ->method('getName')
+            ->will($this->returnValue($this->className));
+
+        $this
+            ->reflectionClassMock
+            ->method('getFileName')
+            ->will($this->returnValue($this->fileName));
+
+        $reflectionMethodMock = $this->createMock(\ReflectionMethod::class);
+        $reflectionMethodMock
+            ->method('getName')
+            ->willReturn("jobMethodName");
+
+        $this
+            ->reflectionClassMock
+            ->method('getMethods')
+            ->willReturn([$reflectionMethodMock]);
+
+        $this
+            ->reflectionClassMock
+            ->method('getAttributes')
+            ->willReturn([]);
+
+        $this->createWorkAnnotation([
+            'name' => 'myOtherWorkerName',
+            'description' => 'This is my own description',
+            'iterations' => 200,
+            'defaultMethod' => 'doHighBackground',
+            'service' => 'my.service',
+            'servers' => [[
+                'host' => '10.0.0.2',
+                'port' => '80',
+            ]]
+        ]);
+    }
+
+    /**
+     * @return void
+     */
+    public function mockDoctrineAnnotationReader(): void
+    {
+        $this
+            ->doctrineAnnotationReaderMock
+            ->expects($this->once())
+            ->method('getMethodAnnotations')
+            ->willReturn([new Job([
+                'name' => 'job-name-test',
+                'description' => 'This is my own description',
+                'iterations' => 10,
+                'defaultMethod' => 'defaultMethodTest',
+                'timeout' => 12,
+                'minimumExecutionTime' => 13,
+                'servers' => [[
+                    'host' => '192.168.1.2',
+                    'port' => '88',
+                ],]
+            ])]);
+    }
+
+    public function createWorkAnnotation($annotationData): void
+    {
+        $this->workAnnotation = new WorkAnnotation($annotationData);
+    }
+
+    /**
+     * @return void
+     */
+    public function mockReflectionClassWithWorkerAnnotationWithoutMethods(): void
+    {
+        $this
+            ->reflectionClassMock
+            ->method('getNamespaceName')
+            ->will($this->returnValue($this->classNamespace));
+
+        $this
+            ->reflectionClassMock
+            ->method('getName')
+            ->will($this->returnValue($this->className));
+
+        $this
+            ->reflectionClassMock
+            ->method('getFileName')
+            ->will($this->returnValue($this->fileName));
+
+        $this
+            ->reflectionClassMock
+            ->method('getMethods')
+            ->will($this->returnValue([]));
+
+        $this->createWorkAnnotation([
+            'name' => 'myOtherWorkerName',
+            'description' => 'This is my own description',
+            'iterations' => 200,
+            'defaultMethod' => 'doHighBackground',
+            'service' => 'my.service',
+            'servers' => [[
+                'host' => '10.0.0.2',
+                'port' => '80',
+            ]]
+        ]);
+    }
+
+    /**
+     * @return void
+     */
+    public function mockReflectionClassWithoutWorkerAnnotationWithoutMethods(): void
+    {
+        $this->mockReflectionClassWithWorkerAnnotationWithoutMethods();
+        $this->createWorkAnnotation([]);
+    }
+
+    /**
+     * @return void
+     */
+    public function mockReflectionClassWithJobAttributes(): void
+    {
+        $this->reflectionClassMock
+            ->method('getNamespaceName')
+            ->will($this->returnValue($this->classNamespace));
+
+        $this->reflectionClassMock
+            ->method('getName')
+            ->will($this->returnValue($this->className));
+
+        $this->reflectionClassMock
+            ->method('getFileName')
+            ->will($this->returnValue($this->fileName));
+
+        $mockAttribute = $this
+            ->getMockBuilder(\ReflectionMethod::class)
+            ->disableOriginalConstructor()
+            ->setMethods(['newInstance'])
+            ->getMock();
+
+        $mockAttribute
+            ->method('newInstance')
+            ->willReturn(new Job([
+            'name' => 'job-name-test',
+            'description' => 'This is my own description',
+            'iterations' => 10,
+            'defaultMethod' => 'defaultMethodTest',
+            'timeout' => 12,
+            'minimumExecutionTime' => 13,
+            'servers' => [[
+                'host' => '192.168.1.2',
+                'port' => '88',
+            ],]
+        ]));
+
+        $reflectionMethodMock = $this->createMock(\ReflectionMethod::class);
+        $reflectionMethodMock
+            ->method('getAttributes')
+            ->with(Job::class, \ReflectionAttribute::IS_INSTANCEOF)
+            ->willReturn([$mockAttribute]);
+
+        $reflectionMethodMock
+            ->method('getName')
+            ->willReturn("jobMethodName");
+
+        $this->reflectionClassMock
+            ->method('getMethods')
+            ->willReturn([$reflectionMethodMock]);
+
+        $this->reflectionClassMock
+            ->method('getAttributes')
+            ->willReturn([]);
+
+        $this->createWorkAnnotation([
+            'name' => 'myOtherWorkerName',
+            'description' => 'This is my own description',
+            'iterations' => 200,
+            'defaultMethod' => 'doHighBackground',
+            'service' => 'my.service',
+            'servers' => [[
+                'host' => '10.0.0.2',
+                'port' => '80',
+            ]]
         ]);
     }
 }

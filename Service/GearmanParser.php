@@ -236,7 +236,12 @@ class GearmanParser
              */
             $classNamespace = $this->getFileClassNamespace($file->getRealpath());
             $reflectionClass = new ReflectionClass($classNamespace);
-            $classAnnotations = $reader->getClassAnnotations($reflectionClass);
+            $classAttributes = $reflectionClass->getAttributes(WorkAnnotation::class, \ReflectionAttribute::IS_INSTANCEOF);
+            if (empty($classAttributes)) {
+                $classAnnotations = $reader->getClassAnnotations($reflectionClass);
+            } else {
+                $classAnnotations = array_map(fn($attribute) => $attribute->newInstance(), $classAttributes);
+            }
 
             /**
              * Every annotation found is parsed

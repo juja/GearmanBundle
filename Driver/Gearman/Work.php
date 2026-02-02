@@ -7,6 +7,7 @@ use Doctrine\Common\Annotations\Annotation;
 /**
  * @Annotation
  */
+#[\Attribute]
 class Work extends Annotation
 {
     /**
