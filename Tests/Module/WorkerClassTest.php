@@ -148,7 +148,6 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
         $workerClass = new WorkerClass(
             $this->workAnnotation,
             $this->reflectionClassMock,
-            $this->doctrineAnnotationReaderMock,
             $this->servers,
             $this->defaultSettings
         );
@@ -159,7 +158,19 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
     public function testWorkerAnnotationsDefinedWithJobs()
     {
         $this->mockReflectionClassWithOneMethod();
-        $this->mockDoctrineAnnotationReader();
+        $jobData = [
+            'name' => 'job-name-test',
+            'description' => 'This is my own description',
+            'iterations' => 10,
+            'defaultMethod' => 'defaultMethodTest',
+            'timeout' => 12,
+            'minimumExecutionTime' => 13,
+            'servers' => [[
+                'host' => '192.168.1.2',
+                'port' => '88',
+            ],]
+        ];
+        $this->mockReflectionMethodWithJobData($jobData);
         $expectedWorkerConfig = [
             'namespace' => 'MyClassNamespace',
             'className' => 'myClass',
@@ -201,7 +212,6 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
         $workerClass = new WorkerClass(
             $this->workAnnotation,
             $this->reflectionClassMock,
-            $this->doctrineAnnotationReaderMock,
             $this->servers,
             $this->defaultSettings
         );
@@ -253,7 +263,6 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
         $workerClass = new WorkerClass(
             $this->workAnnotation,
             $this->reflectionClassMock,
-            $this->doctrineAnnotationReaderMock,
             $this->servers,
             $this->defaultSettings
         );
@@ -288,7 +297,6 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
         $workerClass = new WorkerClass(
             $this->workAnnotation,
             $this->reflectionClassMock,
-            $this->doctrineAnnotationReaderMock,
             $this->servers,
             $this->defaultSettings
         );
@@ -324,7 +332,6 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
         $workerClass = new WorkerClass(
             $this->workAnnotation,
             $this->reflectionClassMock,
-            $this->doctrineAnnotationReaderMock,
             $this->servers,
             $this->defaultSettings
         );
@@ -352,15 +359,6 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
             ->method('getFileName')
             ->will($this->returnValue($this->fileName));
 
-        $reflectionMethodMock = $this->createMock(\ReflectionMethod::class);
-        $reflectionMethodMock
-            ->method('getName')
-            ->willReturn("jobMethodName");
-
-        $this
-            ->reflectionClassMock
-            ->method('getMethods')
-            ->willReturn([$reflectionMethodMock]);
 
         $this
             ->reflectionClassMock
@@ -378,29 +376,6 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
                 'port' => '80',
             ]]
         ]);
-    }
-
-    /**
-     * @return void
-     */
-    public function mockDoctrineAnnotationReader(): void
-    {
-        $this
-            ->doctrineAnnotationReaderMock
-            ->expects($this->once())
-            ->method('getMethodAnnotations')
-            ->willReturn([new Job([
-                'name' => 'job-name-test',
-                'description' => 'This is my own description',
-                'iterations' => 10,
-                'defaultMethod' => 'defaultMethodTest',
-                'timeout' => 12,
-                'minimumExecutionTime' => 13,
-                'servers' => [[
-                    'host' => '192.168.1.2',
-                    'port' => '88',
-                ],]
-            ])]);
     }
 
     public function createWorkAnnotation($annotationData): void
@@ -472,15 +447,7 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
             ->method('getFileName')
             ->will($this->returnValue($this->fileName));
 
-        $mockAttribute = $this
-            ->getMockBuilder(\ReflectionMethod::class)
-            ->disableOriginalConstructor()
-            ->setMethods(['newInstance'])
-            ->getMock();
-
-        $mockAttribute
-            ->method('newInstance')
-            ->willReturn(new Job([
+        $this->mockReflectionMethodWithJobData([
             'name' => 'job-name-test',
             'description' => 'This is my own description',
             'iterations' => 10,
@@ -491,21 +458,7 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
                 'host' => '192.168.1.2',
                 'port' => '88',
             ],]
-        ]));
-
-        $reflectionMethodMock = $this->createMock(\ReflectionMethod::class);
-        $reflectionMethodMock
-            ->method('getAttributes')
-            ->with(Job::class, \ReflectionAttribute::IS_INSTANCEOF)
-            ->willReturn([$mockAttribute]);
-
-        $reflectionMethodMock
-            ->method('getName')
-            ->willReturn("jobMethodName");
-
-        $this->reflectionClassMock
-            ->method('getMethods')
-            ->willReturn([$reflectionMethodMock]);
+        ]);
 
         $this->reflectionClassMock
             ->method('getAttributes')
@@ -522,5 +475,32 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
                 'port' => '80',
             ]]
         ]);
+    }
+
+    public function mockReflectionMethodWithJobData($jobData): void
+    {
+        $mockAttribute = $this
+            ->getMockBuilder(\ReflectionMethod::class)
+            ->disableOriginalConstructor()
+            ->setMethods(['newInstance'])
+            ->getMock();
+
+        $mockAttribute
+            ->method('newInstance')
+            ->willReturn(new Job($jobData));
+
+        $reflectionMethodMock = $this->createMock(\ReflectionMethod::class);
+        $reflectionMethodMock
+            ->method('getAttributes')
+            ->with(Job::class, \ReflectionAttribute::IS_INSTANCEOF)
+            ->willReturn([$mockAttribute]);
+
+        $reflectionMethodMock
+            ->method('getName')
+            ->willReturn("jobMethodName");
+
+        $this->reflectionClassMock
+            ->method('getMethods')
+            ->willReturn([$reflectionMethodMock]);
     }
 }

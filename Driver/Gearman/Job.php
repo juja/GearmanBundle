@@ -2,13 +2,9 @@
 
 namespace Mmoreram\GearmanBundle\Driver\Gearman;
 
-use Doctrine\Common\Annotations\Annotation;
 
-/**
- * @Annotation
- */
 #[\Attribute]
-class Job extends Annotation
+class Job
 {
     /**
      * Method name to assign into job
@@ -41,4 +37,11 @@ class Job extends Annotation
      * Number of seconds the execution must run before being allowed to terminate
      */
     public ?int $minimumExecutionTime = null;
+
+    public function __construct(array $data)
+    {
+        foreach ($data as $key => $value) {
+            $this->{$key} = $value;
+        }
+    }
 }

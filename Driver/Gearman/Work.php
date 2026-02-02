@@ -2,13 +2,8 @@
 
 namespace Mmoreram\GearmanBundle\Driver\Gearman;
 
-use Doctrine\Common\Annotations\Annotation;
-
-/**
- * @Annotation
- */
 #[\Attribute]
-class Work extends Annotation
+class Work
 {
     /**
      * Name of worker
@@ -53,4 +48,11 @@ class Work extends Annotation
      * Otherwise, class will be instance with new() method
      */
     public ?string $service = null;
+
+    public function __construct(array $data)
+    {
+        foreach ($data as $key => $value) {
+            $this->{$key} = $value;
+        }
+    }
 }

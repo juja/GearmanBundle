@@ -8,7 +8,6 @@ services:
         public: true
         arguments:
             - "@kernel"
-            - "@annotation_reader"
             - "@gearman.external.symfony_finder"
             - "%gearman.bundles%"
             - "%gearman.resources%"

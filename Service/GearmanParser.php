@@ -13,7 +13,6 @@
 
 namespace Mmoreram\GearmanBundle\Service;
 
-use Doctrine\Common\Annotations\Reader;
 use ReflectionClass;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\HttpKernel\Bundle\BundleInterface;
@@ -40,7 +39,6 @@ class GearmanParser
      */
     private array $kernelBundles;
     private KernelInterface $kernel;
-    private Reader $reader;
     private Finder $finder;
 
     /**
@@ -72,7 +70,6 @@ class GearmanParser
      * Construct method
      *
      * @param KernelInterface $kernel          Kernel instance
-     * @param Reader          $reader          Reader
      * @param Finder          $finder          Finder
      * @param array           $bundles         Bundle array where to parse workers, defined in configuration
      * @param array           $resources       Array of namespace paths to be searched for worker annotations
@@ -81,7 +78,6 @@ class GearmanParser
      */
     public function __construct(
         KernelInterface $kernel,
-        Reader $reader,
         Finder $finder,
         array $bundles,
         array $resources,
@@ -90,7 +86,6 @@ class GearmanParser
     ) {
         $this->kernelBundles = $kernel->getBundles();
         $this->kernel = $kernel;
-        $this->reader = $reader;
         $this->finder = $finder;
         $this->bundles = $bundles;
         $this->resources = $resources;
@@ -111,7 +106,7 @@ class GearmanParser
         [$paths, $excludedPaths] = $this->loadBundleNamespaceMap($this->kernelBundles, $this->bundles);
         $paths = array_merge($paths, $this->loadResourceNamespaceMap($this->rootDir, $this->resources));
 
-        return $this->parseNamespaceMap($this->finder, $this->reader, $paths, $excludedPaths);
+        return $this->parseNamespaceMap($this->finder, $paths, $excludedPaths);
     }
 
     /**
@@ -183,7 +178,6 @@ class GearmanParser
      * parse them, filling this object
      *
      * @param Finder $finder        Finder
-     * @param Reader $reader        Reader
      * @param array  $paths         Paths where to look for
      * @param array  $excludedPaths Paths to ignore
      *
@@ -191,7 +185,6 @@ class GearmanParser
      */
     public function parseNamespaceMap(
         Finder $finder,
-        Reader $reader,
         array $paths,
         array $excludedPaths
     ) {
@@ -205,7 +198,7 @@ class GearmanParser
                 ->in($paths)
                 ->name('*.php');
 
-            $this->parseFiles($finder, $reader, $workerCollection);
+            $this->parseFiles($finder, $workerCollection);
         }
 
         return $workerCollection;
@@ -215,14 +208,12 @@ class GearmanParser
      * Load all workers with their jobs
      *
      * @param Finder           $finder           Finder
-     * @param Reader           $reader           Reader
      * @param WorkerCollection $workerCollection Worker collection
      *
      * @return GearmanParser self Object
      */
     public function parseFiles(
         Finder $finder,
-        Reader $reader,
         WorkerCollection $workerCollection
     ) {
 
@@ -237,11 +228,7 @@ class GearmanParser
             $classNamespace = $this->getFileClassNamespace($file->getRealpath());
             $reflectionClass = new ReflectionClass($classNamespace);
             $classAttributes = $reflectionClass->getAttributes(WorkAnnotation::class, \ReflectionAttribute::IS_INSTANCEOF);
-            if (empty($classAttributes)) {
-                $classAnnotations = $reader->getClassAnnotations($reflectionClass);
-            } else {
-                $classAnnotations = array_map(fn($attribute) => $attribute->newInstance(), $classAttributes);
-            }
+            $classAnnotations = array_map(fn($attribute) => $attribute->newInstance(), $classAttributes);
 
             /**
              * Every annotation found is parsed
@@ -256,7 +243,7 @@ class GearmanParser
                     /**
                      * Creates new Worker element with all its Job data
                      */
-                    $worker = new Worker($annotation, $reflectionClass, $reader, $this->servers, $this->defaultSettings);
+                    $worker = new Worker($annotation, $reflectionClass, $this->servers, $this->defaultSettings);
                     $workerCollection->add($worker);
                 }
             }

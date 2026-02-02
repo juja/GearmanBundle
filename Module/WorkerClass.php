@@ -2,7 +2,6 @@
 
 namespace Mmoreram\GearmanBundle\Module;
 
-use Doctrine\Common\Annotations\Reader;
 use ReflectionClass;
 
 use Mmoreram\GearmanBundle\Driver\Gearman\Job as JobAnnotation;
@@ -71,7 +70,6 @@ class WorkerClass
     public function __construct(
         WorkAnnotation $workAnnotation,
         ReflectionClass $reflectionClass,
-        Reader $reader,
         array $servers,
         array $defaultSettings
     ) {
@@ -111,7 +109,7 @@ class WorkerClass
         $this->defaultMethod = (string)($workAnnotation->defaultMethod ?? $defaultSettings['method']);
         $this->minimumExecutionTime = (int)($workAnnotation->minimumExecutionTime ?? $defaultSettings['minimum_execution_time']);
         $this->timeout = (int)($workAnnotation->timeout ?? $defaultSettings['timeout']);
-        $this->jobCollection = $this->createJobCollection($reflectionClass, $reader);
+        $this->jobCollection = $this->createJobCollection($reflectionClass);
     }
 
     /**
@@ -139,17 +137,13 @@ class WorkerClass
         return $servers;
     }
 
-    private function createJobCollection(ReflectionClass $reflectionClass, Reader $reader): JobCollection
+    private function createJobCollection(ReflectionClass $reflectionClass): JobCollection
     {
         $jobCollection = new JobCollection();
 
         foreach ($reflectionClass->getMethods() as $reflectionMethod) {
             $methodAttributes = $reflectionMethod->getAttributes(JobAnnotation::class, \ReflectionAttribute::IS_INSTANCEOF);
-            if (empty($methodAttributes)) {
-                $methodAnnotations = $reader->getMethodAnnotations($reflectionMethod);
-            } else {
-                $methodAnnotations = array_map(fn($attribute) => $attribute->newInstance(), $methodAttributes);
-            }
+            $methodAnnotations = array_map(fn($attribute) => $attribute->newInstance(), $methodAttributes);
 
             foreach ($methodAnnotations as $methodAnnotation) {
                 if ($methodAnnotation instanceof JobAnnotation) {
