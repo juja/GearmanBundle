@@ -38,10 +38,14 @@ class Job
      */
     public ?int $minimumExecutionTime = null;
 
-    public function __construct(array $data)
+    public function __construct(?string $name = null, ?string $description = null, ?int $iterations = null, ?string $defaultMethod = null, ?int $timeout = null, ?int $minimumExecutionTime = null, ?array $servers = null)
     {
-        foreach ($data as $key => $value) {
-            $this->{$key} = $value;
-        }
+        $this->name = $name;
+        $this->description = $description;
+        $this->iterations = $iterations;
+        $this->defaultMethod = $defaultMethod;
+        $this->timeout = $timeout;
+        $this->minimumExecutionTime = $minimumExecutionTime;
+        $this->servers = $servers;
     }
 }

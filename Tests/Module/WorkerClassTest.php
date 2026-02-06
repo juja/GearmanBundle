@@ -380,7 +380,7 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
 
     public function createWorkAnnotation($annotationData): void
     {
-        $this->workAnnotation = new WorkAnnotation($annotationData);
+        $this->workAnnotation = new WorkAnnotation(...$annotationData);
     }
 
     /**
@@ -487,7 +487,7 @@ class WorkerClassTest extends \PHPUnit\Framework\TestCase
 
         $mockAttribute
             ->method('newInstance')
-            ->willReturn(new Job($jobData));
+            ->willReturn(new Job(...$jobData));
 
         $reflectionMethodMock = $this->createMock(\ReflectionMethod::class);
         $reflectionMethodMock

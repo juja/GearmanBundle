@@ -49,10 +49,15 @@ class Work
      */
     public ?string $service = null;
 
-    public function __construct(array $data)
+    public function __construct(?string $name = null, ?string $description = null, ?string $defaultMethod = null, ?string $service = null, ?int $iterations = null, ?int $timeout = null, ?int $minimumExecutionTime = null, $servers = null)
     {
-        foreach ($data as $key => $value) {
-            $this->{$key} = $value;
-        }
+        $this->name = $name;
+        $this->description = $description;
+        $this->defaultMethod = $defaultMethod;
+        $this->service = $service;
+        $this->iterations = $iterations;
+        $this->timeout = $timeout;
+        $this->minimumExecutionTime = $minimumExecutionTime;
+        $this->servers = $servers;
     }
 }
